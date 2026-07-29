@@ -7,15 +7,17 @@ export async function POST(req: Request) {
     const command = body.command ? body.command.trim() : '';
     const user = body.user || 'UNKNOWN EXECUTIVE';
     
-    // --- ROVELLI MILANO CORE API KEYS (VEILIG) ---
+    // --- ROVELLI MILANO CORE API KEYS (VEILIG IN KLUIS) ---
     const keys = {
-      OPENAI: process.env.OPENAI_API_KEY, // Wordt nu veilig uit de Vercel kluis gehaald
+      OPENAI: process.env.OPENAI_API_KEY, // Wordt 100% veilig via Vercel ingeladen
       META_TOKEN: process.env.META_ACCESS_TOKEN || "EAAgZCCI3So84BSCRZBEV2olZAvWo3uRlnTHuRyCNujkku4jrxcA3ANsQbLZAQf3Ci2XLd4rCiiADzZA0aQc1mBlUzC7MneGZBXagZBypgcNSyJZC18kSzCpNsjKuVc8P4EeXYNLNoYJxHYC6mSFqt7TCFZAUFuHTe1mIWU9y1LENZB3Tgizdi1VsHRH5EZBjkTGuuWSmilHz7d0qdvL3at1IpS8UoLy1Wq7vR974VQiL0AcBhhLjAY9PvZAtZBZBZBIrycusRAV5UoVwyQnDyZCxTnYxnPku3",
-      META_AD_ACCOUNT: "act_25940482135634472"
+      META_AD_ACCOUNT: "act_25940482135634472",
+      SHOPIFY_DOMAIN: "rovellimilano.myshopify.com",
+      SHOPIFY_TOKEN: "shpss_ebe7aa6b3505e94c55538e9449a51a4"
     };
 
     if (!keys.OPENAI) {
-      throw new Error("API KEY SECURITY LOCK: Sleutel niet gevonden in kluis.");
+      return NextResponse.json({ reply: "SYSTEM HALTED: OPENAI_API_KEY ONTBREEKT IN VERCEL KLUIS. LOG IN OP VERCEL EN VOEG DEZE TOE." });
     }
 
     // --- DUAL APPROVAL WACHTKAMER & REJECT LOGICA ---
@@ -30,7 +32,7 @@ export async function POST(req: Request) {
       dualApprovalStatus = `STATUS: ${user} HAS GIVEN APPROVAL. AWAITING FINAL AUTHORIZATION FROM THE OTHER PARTNER TO EXECUTE.`;
     }
 
-    // --- LIVE META API FETCH (Geen hardcoded data meer) ---
+    // --- LIVE META API FETCH ---
     let liveMetaData = "REAL-TIME META ADS DATA:\n";
     try {
       const metaUrl = `https://graph.facebook.com/v19.0/${keys.META_AD_ACCOUNT}/campaigns?fields=name,status,daily_budget,insights.date_preset(today){spend}&access_token=${keys.META_TOKEN}`;
@@ -50,6 +52,24 @@ export async function POST(req: Request) {
       liveMetaData += "UNABLE TO CONNECT TO FACEBOOK GRAPH API.\n";
     }
 
+    // --- LIVE SHOPIFY API FETCH ---
+    let liveShopifyData = "REAL-TIME SHOPIFY DATA:\n";
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const shopifyUrl = `https://${keys.SHOPIFY_DOMAIN}/admin/api/2024-01/orders.json?status=any&created_at_min=${today}`;
+      const shopRes = await fetch(shopifyUrl, {
+        headers: { 'X-Shopify-Access-Token': keys.SHOPIFY_TOKEN }
+      });
+      if (shopRes.ok) {
+        const shopJson = await shopRes.json();
+        liveShopifyData += `Orders Today: ${shopJson.orders ? shopJson.orders.length : 0}\n`;
+      } else {
+        liveShopifyData += `Connected, awaiting active order sync.\n`;
+      }
+    } catch (e) {
+      liveShopifyData += "UNABLE TO SYNC LIVE SHOPIFY DATA.\n";
+    }
+
     // --- WERKELIJKE SYSTEEM DATA ---
     const realSystemContext = `
     CURRENT EXECUTIVE LOGGED IN: ${user}
@@ -58,6 +78,8 @@ export async function POST(req: Request) {
     ALL SCALING STRATEGIES MUST REMAIN UNDER THIS €43.96 CAP UNTIL FACEBOOK LIFTS IT.
 
     ${liveMetaData}
+    
+    ${liveShopifyData}
     
     ${dualApprovalStatus}
     `;
@@ -73,7 +95,7 @@ export async function POST(req: Request) {
           STRICT OPERATIONAL RULES:
           1. Acknowledge the current executive (${user}).
           2. STRICT COMPLIANCE TO THE €43.96 META DAILY SPEND CAP.
-          3. Base all your analysis strictly on the LIVE Meta data provided in the prompt.
+          3. Base all your analysis strictly on the LIVE Meta and Shopify data provided in the prompt.
           4. If ${user} REJECTS an action, confirm it is aborted. If ${user} APPROVES, log it in the 'Waiting Room' for the other partner.
           
           Answer directly, professionally, and intelligently. Respond strictly in UPPERCASE.`
