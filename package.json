@@ -9,7 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@shopify/shopify-api": "^13.1.0",
+    "axios": "^1.18.1",
+    "facebook-nodejs-business-sdk": "^24.0.1",
+    "klaviyo-api": "^23.0.0",
     "next": "16.2.12",
+    "openai": "^7.0.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
