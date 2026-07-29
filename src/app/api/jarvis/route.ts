@@ -9,11 +9,11 @@ export async function POST(req: Request) {
     
     // --- ROVELLI MILANO CORE API KEYS (VEILIG IN KLUIS) ---
     const keys = {
-      OPENAI: process.env.OPENAI_API_KEY, // Wordt 100% veilig via Vercel ingeladen
+      OPENAI: process.env.OPENAI_API_KEY,
       META_TOKEN: process.env.META_ACCESS_TOKEN || "EAAgZCCI3So84BSCRZBEV2olZAvWo3uRlnTHuRyCNujkku4jrxcA3ANsQbLZAQf3Ci2XLd4rCiiADzZA0aQc1mBlUzC7MneGZBXagZBypgcNSyJZC18kSzCpNsjKuVc8P4EeXYNLNoYJxHYC6mSFqt7TCFZAUFuHTe1mIWU9y1LENZB3Tgizdi1VsHRH5EZBjkTGuuWSmilHz7d0qdvL3at1IpS8UoLy1Wq7vR974VQiL0AcBhhLjAY9PvZAtZBZBZBIrycusRAV5UoVwyQnDyZCxTnYxnPku3",
-      META_AD_ACCOUNT: "act_25940482135634472",
-      SHOPIFY_DOMAIN: "rovellimilano.myshopify.com",
-      SHOPIFY_TOKEN: "shpss_ebe7aa6b3505e94c55538e9449a51a4"
+      META_AD_ACCOUNT: process.env.META_AD_ACCOUNT || "act_25940482135634472",
+      SHOPIFY_DOMAIN: process.env.SHOPIFY_STORE_DOMAIN || "rovellimilano.myshopify.com",
+      SHOPIFY_TOKEN: process.env.SHOPIFY_ACCESS_TOKEN || "shpss_ebe7aa6b3505e94c55538e9449a51a4"
     };
 
     if (!keys.OPENAI) {
@@ -56,15 +56,20 @@ export async function POST(req: Request) {
     let liveShopifyData = "REAL-TIME SHOPIFY DATA:\n";
     try {
       const today = new Date().toISOString().split('T')[0];
-      const shopifyUrl = `https://${keys.SHOPIFY_DOMAIN}/admin/api/2024-01/orders.json?status=any&created_at_min=${today}`;
+      const shopifyUrl = `https://${keys.SHOPIFY_DOMAIN}/admin/api/2024-01/orders.json?status=any&created_at_min=${today}T00:00:00Z`;
       const shopRes = await fetch(shopifyUrl, {
-        headers: { 'X-Shopify-Access-Token': keys.SHOPIFY_TOKEN }
+        headers: { 
+          'X-Shopify-Access-Token': keys.SHOPIFY_TOKEN,
+          'Content-Type': 'application/json'
+        }
       });
       if (shopRes.ok) {
         const shopJson = await shopRes.json();
-        liveShopifyData += `Orders Today: ${shopJson.orders ? shopJson.orders.length : 0}\n`;
+        const orders = shopJson.orders || [];
+        const totalRevenue = orders.reduce((sum: number, order: any) => sum + parseFloat(order.total_price || '0'), 0);
+        liveShopifyData += `Orders Today: ${orders.length} | Total Revenue Today: €${totalRevenue.toFixed(2)}\n`;
       } else {
-        liveShopifyData += `Connected, awaiting active order sync.\n`;
+        liveShopifyData += `Shopify Connected, but returned status ${shopRes.status}.\n`;
       }
     } catch (e) {
       liveShopifyData += "UNABLE TO SYNC LIVE SHOPIFY DATA.\n";
@@ -95,10 +100,10 @@ export async function POST(req: Request) {
           STRICT OPERATIONAL RULES:
           1. Acknowledge the current executive (${user}).
           2. STRICT COMPLIANCE TO THE €43.96 META DAILY SPEND CAP.
-          3. Base all your analysis strictly on the LIVE Meta and Shopify data provided in the prompt.
+          3. Base your analysis strictly on the LIVE Meta and Shopify data provided in the prompt. Never output placeholder or fallback text if data is present.
           4. If ${user} REJECTS an action, confirm it is aborted. If ${user} APPROVES, log it in the 'Waiting Room' for the other partner.
           
-          Answer directly, professionally, and intelligently. Respond strictly in UPPERCASE.`
+          Answer directly, professionally, and intelligently based on the real data. Respond strictly in UPPERCASE.`
         },
         { role: "user", content: command + "\n\n" + realSystemContext }
       ],
